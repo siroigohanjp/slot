@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>スロット＋スキル強化＋ログ表示</title>
+<title>スロット＋スキル強化＋ログ</title>
 <style>
 :root{--bg:#0b1220;--card:#0f1724;--accent:#f59e0b;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
 *{box-sizing:border-box}
@@ -91,7 +91,7 @@ h1{font-size:20px;margin:0}
     '🍒':{three:5,two:1},'🍊':{three:7,two:1},'🍋':{three:8,two:1},
     '⭐':{three:12,two:2},'7️⃣':{three:25,two:3},'💎':{three:40,two:5}
   };
-  const KEY='slot_autosave_v3';
+  const KEY='slot_autosave_v4';
   const startScreen=document.getElementById('startScreen');
   const gameArea=document.getElementById('gameArea');
   const reelsEl=document.getElementById('reels');
@@ -111,23 +111,24 @@ h1{font-size:20px;margin:0}
   let reelsCount=3;
   let autoSpinTimer=null, autoActive=false;
   let logs=[];
+  let currentSymbols=[]; // ← 前回結果を保持して次まで維持
   const skills={
     autoSpin:{name:'自動スピン',level:0,cost:10,baseTime:5000},
     addReel:{name:'スロット枠追加',level:0,cost:20}
   };
 
-  const save=()=>localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,reelsCount,skills,logs}));
+  const save=()=>localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,reelsCount,skills,logs,currentSymbols}));
   const load=()=>{
     const d=JSON.parse(localStorage.getItem(KEY)||'{}');
     balance=d.balance??50;plays=d.plays??0;bestBalance=d.bestBalance??50;bestPayout=d.bestPayout??0;
-    reelsCount=d.reelsCount??3;
-    logs=d.logs??[];
+    reelsCount=d.reelsCount??3;logs=d.logs??[];
+    currentSymbols=d.currentSymbols??[];
     if(d.skills){Object.keys(skills).forEach(k=>Object.assign(skills[k],d.skills[k]||{}));}
   };
   const reset=()=>{balance=50;plays=0;bestBalance=50;bestPayout=0;reelsCount=3;
     skills.autoSpin.level=0;skills.autoSpin.cost=10;
     skills.addReel.level=0;skills.addReel.cost=20;
-    logs=[];save();render();alert('初期化しました');
+    logs=[];currentSymbols=[];save();render();alert('初期化しました');
   };
 
   const render=()=>{
@@ -140,7 +141,7 @@ h1{font-size:20px;margin:0}
     for(let i=0;i<reelsCount;i++){
       const r=document.createElement('div');
       r.className='reel';
-      r.innerHTML=`<div class="inner">?</div>`;
+      r.innerHTML=`<div class="inner">${currentSymbols[i]??'?'}</div>`;
       reelsEl.appendChild(r);
     }
 
@@ -171,9 +172,7 @@ h1{font-size:20px;margin:0}
     autoToggle.textContent=`自動スピン：${autoActive?'ON':'OFF'}`;
   };
 
-  const renderLog=()=>{
-    logEl.innerHTML=logs.map(l=>`<div>${l}</div>`).join('');
-  };
+  const renderLog=()=>{logEl.innerHTML=logs.map(l=>`<div>${l}</div>`).join('');};
 
   function spin(){
     if(spinBtn.disabled)return;
@@ -185,10 +184,12 @@ h1{font-size:20px;margin:0}
     const reels=document.querySelectorAll('.reel .inner');
     const timers=[];
 
+    // スピン開始 → アニメーション開始
     for(let i=0;i<reelsCount;i++){
       timers[i]=setInterval(()=>reels[i].textContent=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)],80);
     }
 
+    // 順に止まる
     const stopTimes=Array.from({length:reelsCount},(_,i)=>600+i*200);
     stopTimes.forEach((t,i)=>{
       setTimeout(()=>{
@@ -196,7 +197,9 @@ h1{font-size:20px;margin:0}
         const sym=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
         results[i]=sym;
         reels[i].textContent=sym;
+
         if(i===reelsCount-1){
+          currentSymbols=[...results]; // ← スピン結果を保存して次まで維持
           const pay=calc(results);
           if(pay>0){
             balance+=pay;
@@ -206,7 +209,7 @@ h1{font-size:20px;margin:0}
           }else flash('はずれ');
           logs.unshift(`${new Date().toLocaleTimeString()}｜${results.join(' ')} → ${pay>0?pay+'枚':'なし'}`);
           if(logs.length>20)logs.pop();
-          render();save();
+          save();render();
           spinBtn.disabled=false;
         }
       },t);
@@ -239,7 +242,6 @@ h1{font-size:20px;margin:0}
     balance-=s.cost;
     s.level++;
     s.cost*=2;
-
     if(k==='addReel'){
       reelsCount=Math.min(3+s.level,12);
     }
