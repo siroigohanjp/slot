@@ -1,23 +1,159 @@
-コンテンツへとスキップする
-チャット履歴
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>シングルファイル・スロットマシン</title>
+  <style>
+    :root{--bg:#0b1220;--card:#0f1724;--accent:#f59e0b;--muted:#94a3b8;--glass: rgba(255,255,255,0.03)}
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,'Noto Sans JP',sans-serif;background:linear-gradient(180deg,#071026 0%, #08122a 100%);color:#e6eef8}
+    .wrap{max-width:920px;margin:36px auto;padding:20px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .btn{background:var(--accent);border:none;color:#071026;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+    .ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px 12px;border-radius:10px}
 
-現在のプランをアップグレードする
-あなた:
-HTMLとJavascriptで一枚で生成
-スタート画面にスタートと初期化を表示
-初期化は記録を初期化する
-スタートでゲーム画面に移動
-ゲーム内容は
-所持金50枚からスタート
-所持金が0以下になると強制初期化
-スタートをタッチすると
-3個のドラムが回転して自動停止する
-そろった絵柄によって配当が変化する
-ChatGPT:
+    /* Start screen */
+    .start-screen{display:grid;gap:12px;align-items:center;justify-items:center;padding:36px;border-radius:14px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .big{font-size:28px;font-weight:700}
+    .small{color:var(--muted)}
 
-思考時間: 13s
-スロットマシン
-· html
+    /* Game area */
+    .game{display:none;margin-top:18px}
+    .hud{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+    .panel{background:var(--glass);padding:12px;border-radius:12px;min-width:120px;text-align:center}
+    .balance{font-size:20px;font-weight:800}
+    .records{font-size:12px;color:var(--muted)}
+
+    /* Reels */
+    .reels{display:flex;gap:12px;justify-content:center;margin:24px 0}
+    .reel{width:120px;height:120px;border-radius:14px;background:linear-gradient(180deg,#0f1724,#071224);display:flex;align-items:center;justify-content:center;font-size:48px;box-shadow:inset 0 -6px 20px rgba(0,0,0,0.5);position:relative}
+    .reel .inner{transition:transform 300ms cubic-bezier(.2,.9,.3,1);}
+    .controls{display:flex;gap:10px;justify-content:center}
+    .spin-btn{font-size:16px;padding:12px 18px;border-radius:12px;border:none;background:#06b6d4;color:#031021;font-weight:800;cursor:pointer}
+    .hint{font-size:13px;color:var(--muted);margin-top:8px;text-align:center}
+
+    footer{margin-top:20px;text-align:center;color:var(--muted);font-size:13px}
+
+    /* small screens */
+    @media (max-width:520px){.reel{width:84px;height:84px;font-size:36px}.wrap{padding:12px}.btn{padding:8px 10px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>シングルファイル・スロットマシン</h1>
+      <div>
+        <button id="open-start" class="ghost">スタート画面</button>
+      </div>
+    </header>
+
+    <!-- Start screen -->
+    <section id="startScreen" class="start-screen">
+      <div class="big">ようこそ — 所持金 50枚 から開始</div>
+      <div class="small">"初期化"は記録（プレイ回数・最高所持金・最大配当）をリセットします</div>
+      <div style="display:flex;gap:10px">
+        <button id="btnStart" class="btn">スタート（ゲームへ）</button>
+        <button id="btnReset" class="ghost">初期化（記録を初期化）</button>
+      </div>
+    </section>
+
+    <!-- Game area -->
+    <section id="gameArea" class="game">
+      <div class="hud">
+        <div class="panel">
+          <div class="small">所持金</div>
+          <div id="balance" class="balance">0</div>
+        </div>
+        <div class="panel">
+          <div class="small">プレイ回数</div>
+          <div id="plays">0</div>
+        </div>
+        <div class="panel">
+          <div class="small">最高所持金</div>
+          <div id="bestBalance">0</div>
+        </div>
+        <div class="panel">
+          <div class="small">最大配当</div>
+          <div id="bestPayout">0</div>
+        </div>
+      </div>
+
+      <div class="reels" aria-hidden="false">
+        <div class="reel" id="reel0"><div class="inner">?</div></div>
+        <div class="reel" id="reel1"><div class="inner">?</div></div>
+        <div class="reel" id="reel2"><div class="inner">?</div></div>
+      </div>
+
+      <div class="controls">
+        <button id="spinBtn" class="spin-btn">スピン</button>
+        <button id="goStart" class="ghost">スタート画面へ</button>
+      </div>
+
+      <div class="hint">スピンは1回1枚。そろった絵柄によって配当が変化します。所持金が0以下になると強制初期化されます。</div>
+    </section>
+
+    <footer>emojiでシンプルに作りました。スマホでもタッチで遊べます。</footer>
+  </div>
+
+  <script>
+    (function(){
+      // シンボルと配当表
+      const SYMBOLS = ['🍒','🍊','🍋','⭐','7️⃣','💎'];
+      // 配当: 3つ揃い => multiplier, 2つ揃い => small payout
+      const PAYTABLE = {
+        '🍒': {three: 5, two:1},
+        '🍊': {three: 7, two:1},
+        '🍋': {three: 8, two:1},
+        '⭐': {three: 12, two:2},
+        '7️⃣': {three: 25, two:3},
+        '💎': {three: 40, two:5}
+      };
+
+      // UI要素
+      const startScreen = document.getElementById('startScreen');
+      const gameArea = document.getElementById('gameArea');
+      const btnStart = document.getElementById('btnStart');
+      const btnReset = document.getElementById('btnReset');
+      const spinBtn = document.getElementById('spinBtn');
+      const goStart = document.getElementById('goStart');
+      const balanceEl = document.getElementById('balance');
+      const playsEl = document.getElementById('plays');
+      const bestBalanceEl = document.getElementById('bestBalance');
+      const bestPayoutEl = document.getElementById('bestPayout');
+      const reelEls = [document.getElementById('reel0'),document.getElementById('reel1'),document.getElementById('reel2')];
+
+      // 状態
+      let balance = 50;
+      let plays = 0;
+      let bestBalance = 50;
+      let bestPayout = 0;
+
+      const STORAGE_KEY = 'singlefile_slot_records_v1';
+
+      function loadRecords(){
+        try{
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if(raw){
+            const obj = JSON.parse(raw);
+            plays = obj.plays||0;
+            bestBalance = obj.bestBalance||50;
+            bestPayout = obj.bestPayout||0;
+            balance = obj.balance!==undefined? obj.balance : 50;
+          } else {
+            resetRecords(false);
+          }
+        }catch(e){
+          resetRecords(false);
+        }
+        renderHUD();
+      }
+
+      function saveRecords(){
+        const obj = {plays,bestBalance,bestPayout,balance};
+        localStorage.setItem(STORAGE_KEY,JSON.stringify(obj));
+      }
 
       function resetRecords(showAlert=true){
         plays = 0; bestBalance = 50; bestPayout = 0; balance = 50;
@@ -115,10 +251,52 @@ ChatGPT:
                   alert('所持金が0以下になったため強制的に初期化します。');
                   resetRecords(true);
                 }
-作りました：左の「スロットマシン」ファイルを開いてください。
+              },120);
+            }
+          }, t);
+        });
+      }
 
+      // 配当計算
+      function evaluate(symbols){
+        // 3つ揃い
+        if(symbols[0]===symbols[1] && symbols[1]===symbols[2]){
+          const multi = PAYTABLE[symbols[0]].three;
+          return multi; // そのままの枚数配当
+        }
+        // 2つ揃い（任意）
+        if(symbols[0]===symbols[1] || symbols[0]===symbols[2]){
+          return PAYTABLE[symbols[0]].two || 0;
+        }
+        if(symbols[1]===symbols[2]){
+          return PAYTABLE[symbols[1]].two || 0;
+        }
+        return 0;
+      }
 
+      // 簡易フラッシュメッセージ
+      function flashMessage(text){
+        const el = document.createElement('div');
+        el.textContent = text;
+        Object.assign(el.style,{position:'fixed',left:'50%',top:'18%',transform:'translateX(-50%)',background:'rgba(6,182,212,0.95)',color:'#021024',padding:'10px 14px',borderRadius:'10px',fontWeight:'800',zIndex:9999});
+        document.body.appendChild(el);
+        setTimeout(()=>{ el.style.transition='opacity 400ms'; el.style.opacity='0'; },900);
+        setTimeout(()=>el.remove(),1400);
+      }
 
+      // 初期設定
+      loadRecords();
 
-選択されていません選択されていません
-ChatGPT の回答は必ずしも正しいとは限りません。重要な情報は確認するようにしてください。
+      // Start画面の「open-start」ボタン
+      document.getElementById('open-start').addEventListener('click', ()=>{
+        gameArea.style.display='none';
+        startScreen.style.display='grid';
+      });
+
+      // 初回はStart画面表示
+      startScreen.style.display='grid';
+      gameArea.style.display='none';
+    })();
+  </script>
+</body>
+</html>
