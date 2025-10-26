@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>スロット＋スキル強化</title>
+<title>スロット＋スキル強化＋ログ表示</title>
 <style>
 :root{--bg:#0b1220;--card:#0f1724;--accent:#f59e0b;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
 *{box-sizing:border-box}
@@ -20,29 +20,31 @@ h1{font-size:20px;margin:0}
 .hud{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .panel{background:var(--glass);padding:12px;border-radius:12px;min-width:120px;text-align:center}
 .balance{font-size:20px;font-weight:800}
-.main-area{display:flex;gap:16px;justify-content:space-between;align-items:flex-start}
-.side{flex:1;min-width:180px;background:var(--glass);padding:12px;border-radius:10px}
+.main-area{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+.side{flex:1;min-width:200px;background:var(--glass);padding:12px;border-radius:10px}
 .center{flex:2;display:flex;flex-direction:column;align-items:center}
 .reels{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0}
 .reel{width:100px;height:100px;border-radius:14px;background:linear-gradient(180deg,#0f1724,#071224);display:flex;align-items:center;justify-content:center;font-size:48px;box-shadow:inset 0 -6px 20px rgba(0,0,0,0.5)}
-.controls{display:flex;gap:10px;justify-content:center}
+.controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .spin-btn{font-size:16px;padding:12px 18px;border-radius:12px;border:none;background:#06b6d4;color:#031021;font-weight:800;cursor:pointer}
-.skill{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.skill button{background:var(--accent);border:none;padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:700;color:#031021}
-.skill .label{font-size:14px}
+.skill{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.skill button{background:var(--accent);border:none;padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:700;color:#031021;margin-top:4px}
+.skill .label{font-size:14px;line-height:1.4}
 .hint{font-size:13px;color:var(--muted);margin-top:8px;text-align:center}
+#log{font-size:13px;max-height:240px;overflow-y:auto;line-height:1.5}
+#log div{border-bottom:1px solid rgba(255,255,255,0.05);padding:2px 0}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1>スロット＋スキル強化</h1>
+    <h1>スロット＋スキル強化＋ログ</h1>
     <button id="open-start" class="ghost">スタート画面</button>
   </header>
 
   <section id="startScreen" class="start-screen">
     <div class="big">ようこそ — 所持金 50枚 から開始</div>
-    <div class="small">初期化は記録（プレイ回数・最高所持金・最大配当・スキル）をリセットします</div>
+    <div class="small">初期化は記録（プレイ回数・最高所持金・最大配当・スキル・履歴）をリセットします</div>
     <div style="display:flex;gap:10px">
       <button id="btnStart" class="btn">スタート</button>
       <button id="btnReset" class="ghost">初期化</button>
@@ -61,12 +63,15 @@ h1{font-size:20px;margin:0}
       <div class="side">
         <h3>配当一覧</h3>
         <div id="payList" style="font-size:14px;line-height:1.6"></div>
+        <h3>履歴ログ</h3>
+        <div id="log"></div>
       </div>
 
       <div class="center">
         <div class="reels" id="reels"></div>
         <div class="controls">
           <button id="spinBtn" class="spin-btn">スピン</button>
+          <button id="autoToggle" class="ghost">自動スピン：OFF</button>
         </div>
         <div class="hint">スピンは1回1枚。揃い方で配当が変わります。</div>
       </div>
@@ -86,8 +91,7 @@ h1{font-size:20px;margin:0}
     '🍒':{three:5,two:1},'🍊':{three:7,two:1},'🍋':{three:8,two:1},
     '⭐':{three:12,two:2},'7️⃣':{three:25,two:3},'💎':{three:40,two:5}
   };
-
-  const KEY='slot_autosave_v2';
+  const KEY='slot_autosave_v3';
   const startScreen=document.getElementById('startScreen');
   const gameArea=document.getElementById('gameArea');
   const reelsEl=document.getElementById('reels');
@@ -100,26 +104,30 @@ h1{font-size:20px;margin:0}
   const skillsEl=document.getElementById('skills');
   const btnStart=document.getElementById('btnStart');
   const btnReset=document.getElementById('btnReset');
+  const logEl=document.getElementById('log');
+  const autoToggle=document.getElementById('autoToggle');
 
   let balance=50,plays=0,bestBalance=50,bestPayout=0;
-  let autoSpinTimer=null;
   let reelsCount=3;
+  let autoSpinTimer=null, autoActive=false;
+  let logs=[];
   const skills={
     autoSpin:{name:'自動スピン',level:0,cost:10,baseTime:5000},
     addReel:{name:'スロット枠追加',level:0,cost:20}
   };
 
-  const save=()=>localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,reelsCount,skills}));
+  const save=()=>localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,reelsCount,skills,logs}));
   const load=()=>{
     const d=JSON.parse(localStorage.getItem(KEY)||'{}');
     balance=d.balance??50;plays=d.plays??0;bestBalance=d.bestBalance??50;bestPayout=d.bestPayout??0;
     reelsCount=d.reelsCount??3;
-    if(d.skills){Object.keys(skills).forEach(k=>{Object.assign(skills[k],d.skills[k]||{});});}
+    logs=d.logs??[];
+    if(d.skills){Object.keys(skills).forEach(k=>Object.assign(skills[k],d.skills[k]||{}));}
   };
   const reset=()=>{balance=50;plays=0;bestBalance=50;bestPayout=0;reelsCount=3;
     skills.autoSpin.level=0;skills.autoSpin.cost=10;
     skills.addReel.level=0;skills.addReel.cost=20;
-    save();render();alert('初期化しました');
+    logs=[];save();render();alert('初期化しました');
   };
 
   const render=()=>{
@@ -128,7 +136,6 @@ h1{font-size:20px;margin:0}
     bestBalanceEl.textContent=bestBalance;
     bestPayoutEl.textContent=bestPayout;
 
-    // リール表示
     reelsEl.innerHTML='';
     for(let i=0;i<reelsCount;i++){
       const r=document.createElement('div');
@@ -137,23 +144,35 @@ h1{font-size:20px;margin:0}
       reelsEl.appendChild(r);
     }
 
-    // 配当一覧
     payList.innerHTML='';
     for(const [sym,v] of Object.entries(PAYTABLE)){
       payList.innerHTML+=`${sym}：2個=${v.two}枚 / 3個=${v.three}枚<br>`;
     }
 
-    // スキル表示
     skillsEl.innerHTML='';
     for(const [k,v] of Object.entries(skills)){
+      let extra='';
+      if(k==='autoSpin'){
+        const interval=(Math.max(100,v.baseTime-v.level*100)/1000).toFixed(1);
+        extra=`<br><small>間隔:${interval}s</small>`;
+      }else if(k==='addReel'){
+        extra=`<br><small>枠数:${3+v.level}/12</small>`;
+      }
       const div=document.createElement('div');
       div.className='skill';
       div.innerHTML=`
-        <div class="label">${v.name} Lv.${v.level}<br><small>コスト:${v.cost}枚</small></div>
+        <div class="label">${v.name} Lv.${v.level}${extra}<br><small>コスト:${v.cost}枚</small></div>
         <button ${balance<v.cost?'disabled':''}>強化</button>`;
       div.querySelector('button').onclick=()=>levelUp(k);
       skillsEl.appendChild(div);
     }
+
+    renderLog();
+    autoToggle.textContent=`自動スピン：${autoActive?'ON':'OFF'}`;
+  };
+
+  const renderLog=()=>{
+    logEl.innerHTML=logs.map(l=>`<div>${l}</div>`).join('');
   };
 
   function spin(){
@@ -185,6 +204,8 @@ h1{font-size:20px;margin:0}
             if(pay>bestPayout)bestPayout=pay;
             flash(`配当 ${pay}枚! 🎉`);
           }else flash('はずれ');
+          logs.unshift(`${new Date().toLocaleTimeString()}｜${results.join(' ')} → ${pay>0?pay+'枚':'なし'}`);
+          if(logs.length>20)logs.pop();
           render();save();
           spinBtn.disabled=false;
         }
@@ -217,7 +238,7 @@ h1{font-size:20px;margin:0}
     if(balance<s.cost){alert('所持金が足りません');return;}
     balance-=s.cost;
     s.level++;
-    s.cost*=2; // コスト倍化
+    s.cost*=2;
 
     if(k==='addReel'){
       reelsCount=Math.min(3+s.level,12);
@@ -229,9 +250,8 @@ h1{font-size:20px;margin:0}
 
   function setupAutoSpin(){
     clearInterval(autoSpinTimer);
-    const s=skills.autoSpin;
-    if(s.level>0){
-      const interval=Math.max(100,s.baseTime - s.level*100);
+    if(autoActive && skills.autoSpin.level>0){
+      const interval=Math.max(100,skills.autoSpin.baseTime-skills.autoSpin.level*100);
       autoSpinTimer=setInterval(()=>spin(),interval);
     }
   }
@@ -241,6 +261,12 @@ h1{font-size:20px;margin:0}
   btnReset.onclick=()=>{if(confirm('初期化しますか？'))reset();};
   document.getElementById('open-start').onclick=()=>{gameArea.style.display='none';startScreen.style.display='grid';save();};
   spinBtn.onclick=spin;
+
+  autoToggle.onclick=()=>{
+    autoActive=!autoActive;
+    setupAutoSpin();
+    render();
+  };
 
   load();render();setupAutoSpin();
   window.addEventListener('beforeunload',save);
