@@ -83,7 +83,7 @@
       <div class="panel-side">
         <h3>スキル</h3>
         <div class="skill">
-          <b>自動スピン Lv.<span id="autoLv">1</span></b>
+          <b>自動スピン Lv.<span id="autoLv">1</span> <small>(<span id="autoTime">5.0</span>秒)</small></b>
           <small>次Lvコスト: <span id="autoCost">10</span></small>
           <button id="autoUp">強化</button>
         </div>
@@ -124,18 +124,23 @@
   const autoUp=document.getElementById('autoUp');
   const slotUp=document.getElementById('slotUp');
   const pushUp=document.getElementById('pushUp');
+  const autoTimeEl=document.getElementById('autoTime');
 
   let balance=50,plays=0,bestBalance=50,bestPayout=0;
   let autoLv=1,slotLv=1,pushLv=1;
   let autoOn=false,autoTimer=null,autoCount=0;
   const baseAuto=10,baseSlot=20,basePush=50;
-  const KEY='slot_v6_save';
+  const KEY='slot_v7_save';
 
   function save(){localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,autoLv,slotLv,pushLv}));}
   function load(){
     const d=JSON.parse(localStorage.getItem(KEY)||'{}');
     balance=d.balance??50;plays=d.plays??0;bestBalance=d.bestBalance??50;bestPayout=d.bestPayout??0;
     autoLv=d.autoLv??1;slotLv=d.slotLv??1;pushLv=d.pushLv??1;
+  }
+
+  function currentRecast(){
+    return Math.max(0.1,5-(autoLv-1)*0.1);
   }
 
   function render(){
@@ -149,6 +154,7 @@
     autoCostEl.textContent=baseAuto*Math.pow(2,autoLv-1);
     slotCostEl.textContent=baseSlot*Math.pow(2,slotLv-1);
     pushCostEl.textContent=basePush*Math.pow(2,pushLv-1);
+    autoTimeEl.textContent=currentRecast().toFixed(1);
   }
 
   function buildReels(){
@@ -178,11 +184,10 @@
     plays++;
 
     const results=[];
-    const hitMap=[];
     const rows=reelArea.querySelectorAll('.row');
-    rows.forEach((row,rowIndex)=>{
+    rows.forEach((row)=>{
       const reels=row.querySelectorAll('.reel');
-      reels.forEach((r,i)=>{
+      reels.forEach((r)=>{
         r.classList.remove('win');
         const inner=r.querySelector('.inner');
         const sym=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
@@ -191,18 +196,7 @@
       });
     });
 
-    const pay=calc(results, hitMap) * bet;
-    let totalWin=0;
-
-    rows.forEach((row,y)=>{
-      const reels=row.querySelectorAll('.reel');
-      const r=results.slice(y*3,y*3+3);
-      if(r[0]===r[1]&&r[1]===r[2]){reels.forEach(e=>e.classList.add('win'));totalWin+=PAYTABLE[r[0]].three;}
-      else if(r[0]===r[1]){reels[0].classList.add('win');reels[1].classList.add('win');totalWin+=PAYTABLE[r[0]].two||0;}
-      else if(r[1]===r[2]){reels[1].classList.add('win');reels[2].classList.add('win');totalWin+=PAYTABLE[r[1]].two||0;}
-      else if(r[0]===r[2]){reels[0].classList.add('win');reels[2].classList.add('win');totalWin+=PAYTABLE[r[0]].two||0;}
-    });
-
+    const totalWin=calc(results);
     const payout = totalWin * Math.pow(2, pushLv-1);
     if(payout>0){
       balance+=payout;
@@ -217,14 +211,15 @@
 
   function calc(res){
     let total=0;
-    for(let i=0;i<res.length;i+=3){
-      const r=res.slice(i,i+3);
-      if(r[0]===r[1]&&r[1]===r[2])total+=PAYTABLE[r[0]].three;
-      else if(r[0]===r[1]||r[1]===r[2]||r[0]===r[2]){
-        const s=r[0]===r[1]?r[0]:r[1]===r[2]?r[1]:r[0];
-        total+=PAYTABLE[s].two||0;
-      }
-    }
+    const rows=reelArea.querySelectorAll('.row');
+    rows.forEach((row,y)=>{
+      const reels=row.querySelectorAll('.reel');
+      const r=res.slice(y*3,y*3+3);
+      if(r[0]===r[1]&&r[1]===r[2]){reels.forEach(e=>e.classList.add('win'));total+=PAYTABLE[r[0]].three;}
+      else if(r[0]===r[1]){reels[0].classList.add('win');reels[1].classList.add('win');total+=PAYTABLE[r[0]].two||0;}
+      else if(r[1]===r[2]){reels[1].classList.add('win');reels[2].classList.add('win');total+=PAYTABLE[r[1]].two||0;}
+      else if(r[0]===r[2]){reels[0].classList.add('win');reels[2].classList.add('win');total+=PAYTABLE[r[0]].two||0;}
+    });
     return total;
   }
 
@@ -249,7 +244,7 @@
   }
 
   function autoLoop(){
-    const delay=Math.max(0.1,5-(autoLv-1)*0.1);
+    const delay=currentRecast();
     autoCount=delay;
     const tick=()=>{
       if(!autoOn)return;
