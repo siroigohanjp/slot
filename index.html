@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>スロット＋スキル＋ログ＋タイムカウント</title>
+<title>スロット（段追加タイプ＋タイマー）</title>
 <style>
 :root{--bg:#0b1220;--card:#0f1724;--accent:#f59e0b;--muted:#94a3b8;--glass:rgba(255,255,255,0.03)}
 *{box-sizing:border-box}
@@ -23,7 +23,7 @@ h1{font-size:20px;margin:0}
 .main-area{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
 .side{flex:1;min-width:200px;background:var(--glass);padding:12px;border-radius:10px}
 .center{flex:2;display:flex;flex-direction:column;align-items:center}
-.reels{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0}
+.reels{display:grid;grid-template-columns:repeat(3,100px);gap:8px;justify-content:center;margin:12px 0}
 .reel{width:100px;height:100px;border-radius:14px;background:linear-gradient(180deg,#0f1724,#071224);display:flex;align-items:center;justify-content:center;font-size:48px;box-shadow:inset 0 -6px 20px rgba(0,0,0,0.5)}
 .controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .spin-btn{font-size:16px;padding:12px 18px;border-radius:12px;border:none;background:#06b6d4;color:#031021;font-weight:800;cursor:pointer}
@@ -39,7 +39,7 @@ h1{font-size:20px;margin:0}
 <body>
 <div class="wrap">
   <header>
-    <h1>スロット＋スキル＋ログ＋タイムカウント</h1>
+    <h1>スロット（段追加タイプ＋自動スピン＋ログ＋タイマー）</h1>
     <button id="open-start" class="ghost">スタート画面</button>
   </header>
 
@@ -75,7 +75,7 @@ h1{font-size:20px;margin:0}
           <button id="autoToggle" class="ghost">自動スピン：OFF</button>
         </div>
         <div id="autoTimer"></div>
-        <div class="hint">スピンは1回1枚。揃い方で配当が変わります。</div>
+        <div class="hint">スピンは1回1枚。各段ごとに配当判定。</div>
       </div>
 
       <div class="side">
@@ -93,7 +93,8 @@ h1{font-size:20px;margin:0}
     '🍒':{three:5,two:1},'🍊':{three:7,two:1},'🍋':{three:8,two:1},
     '⭐':{three:12,two:2},'7️⃣':{three:25,two:3},'💎':{three:40,two:5}
   };
-  const KEY='slot_autosave_v5';
+  const KEY='slot_stage_autosave_v1';
+
   const reelsEl=document.getElementById('reels');
   const spinBtn=document.getElementById('spinBtn');
   const balanceEl=document.getElementById('balance');
@@ -109,24 +110,22 @@ h1{font-size:20px;margin:0}
   const autoTimerEl=document.getElementById('autoTimer');
 
   let balance=50,plays=0,bestBalance=50,bestPayout=0;
-  let reelsCount=3;
-  let autoActive=false;
-  let autoInterval=null, countdownTimer=null;
-  let countdown=0;
-  let logs=[], currentSymbols=[];
+  let rows=1; // スロット段数
+  let autoActive=false,countdownTimer=null,countdown=0;
+  let logs=[],currentSymbols=[];
   const skills={
     autoSpin:{name:'自動スピン',level:0,cost:10,baseTime:5000},
-    addReel:{name:'スロット枠追加',level:0,cost:20}
+    addReel:{name:'スロット段追加',level:0,cost:20}
   };
 
-  const save=()=>localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,reelsCount,skills,logs,currentSymbols}));
+  const save=()=>localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,rows,skills,logs,currentSymbols}));
   const load=()=>{
     const d=JSON.parse(localStorage.getItem(KEY)||'{}');
     balance=d.balance??50;plays=d.plays??0;bestBalance=d.bestBalance??50;bestPayout=d.bestPayout??0;
-    reelsCount=d.reelsCount??3;logs=d.logs??[];currentSymbols=d.currentSymbols??[];
+    rows=d.rows??1;logs=d.logs??[];currentSymbols=d.currentSymbols??[];
     if(d.skills)Object.keys(skills).forEach(k=>Object.assign(skills[k],d.skills[k]||{}));
   };
-  const reset=()=>{balance=50;plays=0;bestBalance=50;bestPayout=0;reelsCount=3;
+  const reset=()=>{balance=50;plays=0;bestBalance=50;bestPayout=0;rows=1;
     skills.autoSpin.level=0;skills.autoSpin.cost=10;
     skills.addReel.level=0;skills.addReel.cost=20;
     logs=[];currentSymbols=[];save();render();alert('初期化しました');
@@ -138,11 +137,14 @@ h1{font-size:20px;margin:0}
     bestBalanceEl.textContent=bestBalance;
     bestPayoutEl.textContent=bestPayout;
     reelsEl.innerHTML='';
-    for(let i=0;i<reelsCount;i++){
-      const r=document.createElement('div');
-      r.className='reel';
-      r.innerHTML=`<div class="inner">${currentSymbols[i]??'?'}</div>`;
-      reelsEl.appendChild(r);
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<3;c++){
+        const idx=r*3+c;
+        const reel=document.createElement('div');
+        reel.className='reel';
+        reel.innerHTML=`<div class="inner">${currentSymbols[idx]??'?'}</div>`;
+        reelsEl.appendChild(reel);
+      }
     }
     payList.innerHTML='';
     for(const [sym,v] of Object.entries(PAYTABLE))
@@ -154,7 +156,7 @@ h1{font-size:20px;margin:0}
         const interval=Math.max(100,v.baseTime-v.level*100);
         extra=`<br><small>間隔:${(interval/1000).toFixed(1)}s</small>`;
       }else if(k==='addReel'){
-        extra=`<br><small>枠数:${3+v.level}/12</small>`;
+        extra=`<br><small>段数:${1+v.level}/4</small>`;
       }
       const div=document.createElement('div');
       div.className='skill';
@@ -176,20 +178,21 @@ h1{font-size:20px;margin:0}
     balance--;plays++;render();save();
     spinBtn.disabled=true;
 
+    const totalCells=rows*3;
     const results=[];
     const reels=document.querySelectorAll('.reel .inner');
     const timers=[];
-    for(let i=0;i<reelsCount;i++){
+    for(let i=0;i<totalCells;i++){
       timers[i]=setInterval(()=>reels[i].textContent=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)],80);
     }
-    const stopTimes=Array.from({length:reelsCount},(_,i)=>600+i*200);
+    const stopTimes=Array.from({length:totalCells},(_,i)=>600+i*100);
     stopTimes.forEach((t,i)=>{
       setTimeout(()=>{
         clearInterval(timers[i]);
         const sym=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
         results[i]=sym;
         reels[i].textContent=sym;
-        if(i===reelsCount-1){
+        if(i===totalCells-1){
           currentSymbols=[...results];
           const pay=calc(results);
           if(pay>0){
@@ -198,25 +201,30 @@ h1{font-size:20px;margin:0}
             if(pay>bestPayout)bestPayout=pay;
             flash(`配当 ${pay}枚! 🎉`);
           }else flash('はずれ');
-          logs.unshift(`${new Date().toLocaleTimeString()}｜${results.join(' ')} → ${pay>0?pay+'枚':'なし'}`);
+          logs.unshift(`${new Date().toLocaleTimeString()}｜${formatGrid(results)} → ${pay>0?pay+'枚':'なし'}`);
           if(logs.length>20)logs.pop();
           save();render();
           spinBtn.disabled=false;
-          if(autoActive)startAutoCountdown(); // 自動スピン中なら再カウント
+          if(autoActive)startAutoCountdown();
         }
       },t);
     });
   }
 
+  const formatGrid=(r)=>r.reduce((a,v,i)=>a+(i%3==0? (i==0?'':'｜ '):' ')+v,'');
+
   const calc=(r)=>{
-    const counts={};
-    for(const s of r)counts[s]=(counts[s]||0)+1;
-    let best=0;
-    for(const [s,c] of Object.entries(counts)){
-      if(c>=3)best=Math.max(best,PAYTABLE[s]?.three||0);
-      else if(c===2)best=Math.max(best,PAYTABLE[s]?.two||0);
+    let total=0;
+    for(let i=0;i<rows;i++){
+      const row=r.slice(i*3,i*3+3);
+      const counts={};
+      for(const s of row)counts[s]=(counts[s]||0)+1;
+      for(const [s,c] of Object.entries(counts)){
+        if(c>=3)total+=PAYTABLE[s].three;
+        else if(c===2)total+=PAYTABLE[s].two;
+      }
     }
-    return best;
+    return total;
   };
 
   const flash=(t)=>{
@@ -232,7 +240,7 @@ h1{font-size:20px;margin:0}
     const s=skills[k];
     if(balance<s.cost){alert('所持金が足りません');return;}
     balance-=s.cost;s.level++;s.cost*=2;
-    if(k==='addReel')reelsCount=Math.min(3+s.level,12);
+    if(k==='addReel')rows=Math.min(1+s.level,4);
     save();render();flash(`${s.name} Lv.${s.level} にアップ！`);
   }
 
