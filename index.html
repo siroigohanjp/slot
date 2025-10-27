@@ -42,7 +42,10 @@
 </head>
 <body>
 <div class="wrap">
-  <header><h1>スロットマシン 拡張版+</h1></header>
+  <header>
+    <h1>スロットマシン 拡張版+</h1>
+    <button id="resetBtn" class="ghost">初期化</button>
+  </header>
 
   <div class="top-controls">
     <button id="spinBtn" class="spin-btn">🎰 スピン</button>
@@ -124,19 +127,31 @@
   const autoUp=document.getElementById('autoUp');
   const slotUp=document.getElementById('slotUp');
   const pushUp=document.getElementById('pushUp');
+  const resetBtn=document.getElementById('resetBtn');
   const autoTimeEl=document.getElementById('autoTime');
 
   let balance=50,plays=0,bestBalance=50,bestPayout=0;
   let autoLv=1,slotLv=1,pushLv=1;
   let autoOn=false,autoTimer=null,autoCount=0;
   const baseAuto=10,baseSlot=20,basePush=50;
-  const KEY='slot_v7_save';
+  const KEY='slot_v8_save';
 
   function save(){localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,autoLv,slotLv,pushLv}));}
   function load(){
     const d=JSON.parse(localStorage.getItem(KEY)||'{}');
     balance=d.balance??50;plays=d.plays??0;bestBalance=d.bestBalance??50;bestPayout=d.bestPayout??0;
     autoLv=d.autoLv??1;slotLv=d.slotLv??1;pushLv=d.pushLv??1;
+  }
+
+  function reset(){
+    balance=50;plays=0;bestBalance=50;bestPayout=0;
+    autoLv=1;slotLv=1;pushLv=1;
+    stopAuto();
+    save();
+    buildReels();
+    render();
+    logEl.innerHTML='';
+    addLog('💫 ゲームを初期化しました');
   }
 
   function currentRecast(){
@@ -176,10 +191,10 @@
   }
 
   function spin(){
-    if(balance<=0){alert('所持金が0です');return;}
+    if(balance<=0){autoOn && stopAuto();reset();return;}
     spinBtn.disabled=true;
 
-    const bet = Math.pow(2, pushLv-1); // 掛け金倍率
+    const bet = Math.pow(2, pushLv-1);
     balance -= bet;
     plays++;
 
@@ -205,6 +220,7 @@
       addLog(`+${payout}枚 🎉`);
     } else addLog(`はずれ (-${bet}枚)`);
 
+    if(balance<=0){addLog('💀 所持金が0になりました。初期化します。');stopAuto();reset();return;}
     render();save();
     spinBtn.disabled=false;
   }
@@ -275,6 +291,7 @@
     if(balance<cost)return alert(`強化に${cost}枚必要です`);
     balance-=cost;pushLv++;render();save();addLog(`倍プッシュ Lv${pushLv} 強化 (-${cost}枚)`);
   };
+  resetBtn.onclick=()=>{if(confirm('すべて初期化しますか？'))reset();};
   spinBtn.onclick=spin;
 
   load();render();buildReels();
