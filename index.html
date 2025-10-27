@@ -3,43 +3,46 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>スロットマシン拡張版</title>
+<title>スロットマシン 拡張版+</title>
 <style>
-  :root{--bg:#0b1220;--panel:#0f1724;--accent:#f59e0b;--muted:#94a3b8;--glass:rgba(255,255,255,0.03);}
-  html,body{height:100%;margin:0;font-family:"Segoe UI","Noto Sans JP",sans-serif;background:linear-gradient(180deg,#071026,#08122a);color:#e6eef8;}
+  :root{
+    --bg:#0b1220;--panel:#0f1724;--accent:#f59e0b;
+    --muted:#94a3b8;--glass:rgba(255,255,255,0.03);
+    --win:rgba(6,182,212,0.35);
+  }
+  html,body{margin:0;height:100%;font-family:"Segoe UI","Noto Sans JP",sans-serif;
+    background:linear-gradient(180deg,#071026,#08122a);color:#e6eef8}
   .wrap{max-width:980px;margin:24px auto;padding:20px}
   header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
   h1{font-size:20px;margin:0}
   .btn{background:var(--accent);border:none;color:#071026;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}
   .ghost{background:transparent;border:1px solid rgba(255,255,255,0.08);color:var(--muted);padding:8px 12px;border-radius:10px;cursor:pointer}
-
   .hud{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
   .panel{background:var(--glass);padding:10px;border-radius:10px;min-width:120px;text-align:center}
   .balance{font-size:20px;font-weight:800}
-  
   .top-controls{display:flex;gap:10px;justify-content:center;margin-bottom:10px}
   .spin-btn{font-size:16px;padding:12px 18px;border-radius:12px;border:none;background:#06b6d4;color:#031021;font-weight:800;cursor:pointer}
-  
+  .countdown{font-size:13px;color:var(--muted);text-align:center;margin-top:-4px}
   .area{display:flex;gap:20px;margin-top:10px}
   .reel-area{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
   .row{display:flex;gap:10px;justify-content:center}
-  .reel{width:100px;height:100px;border-radius:14px;background:linear-gradient(180deg,#0f1724,#071224);display:flex;align-items:center;justify-content:center;font-size:44px;box-shadow:inset 0 -6px 20px rgba(0,0,0,0.5);position:relative;}
-  .reel .inner{transition:transform 300ms cubic-bezier(.2,.9,.3,1);}
-  
-  .side{width:200px;display:flex;flex-direction:column;gap:12px}
+  .reel{width:100px;height:100px;border-radius:14px;background:linear-gradient(180deg,#0f1724,#071224);
+    display:flex;align-items:center;justify-content:center;font-size:44px;
+    box-shadow:inset 0 -6px 20px rgba(0,0,0,0.5);position:relative;transition:background 0.3s}
+  .win{background:linear-gradient(180deg,#08303a,#09505a)}
+  .side{width:240px;display:flex;flex-direction:column;gap:12px}
   .panel-side{background:var(--glass);padding:10px;border-radius:10px}
   .panel-side h3{font-size:15px;margin:0 0 6px}
-  .skill{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:14px}
-  .skill button{font-size:12px;padding:4px 8px;border-radius:8px;border:none;background:var(--accent);color:#071026;font-weight:700;cursor:pointer}
-  
-  .log{position:fixed;bottom:10px;left:10px;width:260px;max-height:220px;overflow:auto;background:rgba(0,0,0,0.3);padding:10px;border-radius:10px;font-size:13px;line-height:1.4}
+  .skill{margin-bottom:8px;font-size:14px;display:flex;flex-direction:column;gap:2px}
+  .skill button{font-size:12px;padding:4px 8px;border-radius:8px;border:none;background:var(--accent);color:#071026;font-weight:700;cursor:pointer;width:fit-content}
+  .skill small{color:var(--muted)}
+  .log{background:var(--glass);padding:10px;border-radius:10px;max-height:260px;overflow:auto;font-size:13px;line-height:1.4}
   .log div{margin-bottom:4px}
-  .countdown{font-size:13px;color:var(--muted);text-align:center;margin-top:-4px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header><h1>スロットマシン拡張版</h1></header>
+  <header><h1>スロットマシン 拡張版+</h1></header>
 
   <div class="top-controls">
     <button id="spinBtn" class="spin-btn">🎰 スピン</button>
@@ -55,31 +58,49 @@
   </div>
 
   <div class="area">
+    <!-- 左：ログ -->
     <div class="side">
       <div class="panel-side">
-        <h3>配当一覧</h3>
-        <div>🍒 ×3 = 5 / ×2 = 1</div>
-        <div>🍊 ×3 = 7 / ×2 = 1</div>
-        <div>🍋 ×3 = 8 / ×2 = 1</div>
-        <div>⭐ ×3 = 12 / ×2 = 2</div>
-        <div>7️⃣ ×3 = 25 / ×2 = 3</div>
-        <div>💎 ×3 = 40 / ×2 = 5</div>
+        <h3>スピンログ</h3>
+        <div id="log" class="log"></div>
       </div>
     </div>
 
+    <!-- 中央：スロット -->
     <div class="reel-area" id="reelArea"></div>
 
+    <!-- 右：配当 + スキル -->
     <div class="side">
       <div class="panel-side">
+        <h3>配当一覧</h3>
+        <div>🍒 ×3=5 / ×2=1</div>
+        <div>🍊 ×3=7 / ×2=1</div>
+        <div>🍋 ×3=8 / ×2=1</div>
+        <div>⭐ ×3=12 / ×2=2</div>
+        <div>7️⃣ ×3=25 / ×2=3</div>
+        <div>💎 ×3=40 / ×2=5</div>
+      </div>
+      <div class="panel-side">
         <h3>スキル</h3>
-        <div class="skill">自動スピン Lv.<span id="autoLv">1</span> <button id="autoUp">強化</button></div>
-        <div class="skill">スロット追加 Lv.<span id="slotLv">1</span> <button id="slotUp">強化</button></div>
+        <div class="skill">
+          <b>自動スピン Lv.<span id="autoLv">1</span></b>
+          <small>次Lvコスト: <span id="autoCost">10</span></small>
+          <button id="autoUp">強化</button>
+        </div>
+        <div class="skill">
+          <b>スロット追加 Lv.<span id="slotLv">1</span></b>
+          <small>次Lvコスト: <span id="slotCost">20</span></small>
+          <button id="slotUp">強化</button>
+        </div>
+        <div class="skill">
+          <b>倍プッシュ Lv.<span id="pushLv">1</span></b>
+          <small>次Lvコスト: <span id="pushCost">50</span></small>
+          <button id="pushUp">強化</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
-
-<div class="log" id="log"></div>
 
 <script>
 (()=>{
@@ -92,24 +113,29 @@
   const bestPayoutEl=document.getElementById('bestPayout');
   const autoLvEl=document.getElementById('autoLv');
   const slotLvEl=document.getElementById('slotLv');
+  const pushLvEl=document.getElementById('pushLv');
+  const autoCostEl=document.getElementById('autoCost');
+  const slotCostEl=document.getElementById('slotCost');
+  const pushCostEl=document.getElementById('pushCost');
   const autoBtn=document.getElementById('autoBtn');
   const countdownEl=document.getElementById('autoCountdown');
   const logEl=document.getElementById('log');
   const spinBtn=document.getElementById('spinBtn');
   const autoUp=document.getElementById('autoUp');
   const slotUp=document.getElementById('slotUp');
+  const pushUp=document.getElementById('pushUp');
 
   let balance=50,plays=0,bestBalance=50,bestPayout=0;
-  let autoLv=1,slotLv=1;
+  let autoLv=1,slotLv=1,pushLv=1;
   let autoOn=false,autoTimer=null,autoCount=0;
-  const baseCostAuto=10,baseCostSlot=20;
-  const KEY='slot_v5_autosave';
+  const baseAuto=10,baseSlot=20,basePush=50;
+  const KEY='slot_v6_save';
 
-  function save(){localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,autoLv,slotLv}));}
+  function save(){localStorage.setItem(KEY,JSON.stringify({balance,plays,bestBalance,bestPayout,autoLv,slotLv,pushLv}));}
   function load(){
     const d=JSON.parse(localStorage.getItem(KEY)||'{}');
     balance=d.balance??50;plays=d.plays??0;bestBalance=d.bestBalance??50;bestPayout=d.bestPayout??0;
-    autoLv=d.autoLv??1;slotLv=d.slotLv??1;
+    autoLv=d.autoLv??1;slotLv=d.slotLv??1;pushLv=d.pushLv??1;
   }
 
   function render(){
@@ -119,6 +145,10 @@
     bestPayoutEl.textContent=bestPayout;
     autoLvEl.textContent=autoLv;
     slotLvEl.textContent=slotLv;
+    pushLvEl.textContent=pushLv;
+    autoCostEl.textContent=baseAuto*Math.pow(2,autoLv-1);
+    slotCostEl.textContent=baseSlot*Math.pow(2,slotLv-1);
+    pushCostEl.textContent=basePush*Math.pow(2,pushLv-1);
   }
 
   function buildReels(){
@@ -142,24 +172,45 @@
   function spin(){
     if(balance<=0){alert('所持金が0です');return;}
     spinBtn.disabled=true;
-    balance--;plays++;
+
+    const bet = Math.pow(2, pushLv-1); // 掛け金倍率
+    balance -= bet;
+    plays++;
+
     const results=[];
+    const hitMap=[];
     const rows=reelArea.querySelectorAll('.row');
     rows.forEach((row,rowIndex)=>{
-      const reels=row.querySelectorAll('.reel .inner');
-      reels.forEach((inner,i)=>{
+      const reels=row.querySelectorAll('.reel');
+      reels.forEach((r,i)=>{
+        r.classList.remove('win');
+        const inner=r.querySelector('.inner');
         const sym=SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
         inner.textContent=sym;
         results.push(sym);
       });
     });
-    const pay=calc(results);
-    if(pay>0){
-      balance+=pay;
+
+    const pay=calc(results, hitMap) * bet;
+    let totalWin=0;
+
+    rows.forEach((row,y)=>{
+      const reels=row.querySelectorAll('.reel');
+      const r=results.slice(y*3,y*3+3);
+      if(r[0]===r[1]&&r[1]===r[2]){reels.forEach(e=>e.classList.add('win'));totalWin+=PAYTABLE[r[0]].three;}
+      else if(r[0]===r[1]){reels[0].classList.add('win');reels[1].classList.add('win');totalWin+=PAYTABLE[r[0]].two||0;}
+      else if(r[1]===r[2]){reels[1].classList.add('win');reels[2].classList.add('win');totalWin+=PAYTABLE[r[1]].two||0;}
+      else if(r[0]===r[2]){reels[0].classList.add('win');reels[2].classList.add('win');totalWin+=PAYTABLE[r[0]].two||0;}
+    });
+
+    const payout = totalWin * Math.pow(2, pushLv-1);
+    if(payout>0){
+      balance+=payout;
       if(balance>bestBalance)bestBalance=balance;
-      if(pay>bestPayout)bestPayout=pay;
-      addLog(`+${pay}枚 🎉`);
-    }else addLog('はずれ');
+      if(payout>bestPayout)bestPayout=payout;
+      addLog(`+${payout}枚 🎉`);
+    } else addLog(`はずれ (-${bet}枚)`);
+
     render();save();
     spinBtn.disabled=false;
   }
@@ -214,19 +265,21 @@
   }
 
   autoBtn.onclick=()=>autoOn?stopAuto():startAuto();
-
   autoUp.onclick=()=>{
-    const cost=baseCostAuto*Math.pow(2,autoLv-1);
+    const cost=baseAuto*Math.pow(2,autoLv-1);
     if(balance<cost)return alert(`強化に${cost}枚必要です`);
-    balance-=cost;autoLv++;render();save();addLog(`自動スピンLv${autoLv}に強化（-${cost}枚）`);
+    balance-=cost;autoLv++;render();save();addLog(`自動スピン Lv${autoLv} 強化 (-${cost}枚)`);
   };
-
   slotUp.onclick=()=>{
-    const cost=baseCostSlot*Math.pow(2,slotLv-1);
+    const cost=baseSlot*Math.pow(2,slotLv-1);
     if(balance<cost)return alert(`強化に${cost}枚必要です`);
-    balance-=cost;slotLv++;buildReels();render();save();addLog(`スロットLv${slotLv}に強化（-${cost}枚）`);
+    balance-=cost;slotLv++;buildReels();render();save();addLog(`スロット追加 Lv${slotLv} 強化 (-${cost}枚)`);
   };
-
+  pushUp.onclick=()=>{
+    const cost=basePush*Math.pow(2,pushLv-1);
+    if(balance<cost)return alert(`強化に${cost}枚必要です`);
+    balance-=cost;pushLv++;render();save();addLog(`倍プッシュ Lv${pushLv} 強化 (-${cost}枚)`);
+  };
   spinBtn.onclick=spin;
 
   load();render();buildReels();
